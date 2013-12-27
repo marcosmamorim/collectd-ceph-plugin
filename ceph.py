@@ -32,6 +32,19 @@ SECRET_KEY = 'SECRET_KEY_key'
 SERVER = 'radosgw_address'
 VERBOSE_LOGGING = True
 METRIC_DELIM = '.' # for the frontend/backend stats
+METRIC_TYPES = {
+   'bytes_received': ('bytes_received', 'derive'),
+   'bytes_sent': ('bytes_sent', 'derive'),
+   'category': ('category', 'derive'),
+   'ops': ('ops', 'counter'),
+   'successful_ops': ('successful_ops', 'counter'),
+   'num_objects': ('num_objects', 'counter'),
+   'size_kb': ('size_kb', 'derive'),
+   'size_kb_actual': ('size_kb_actual', 'derive')
+}
+
+
+
 
 def log_verbose(msg):
 	if not VERBOSE_LOGGING:
@@ -62,18 +75,32 @@ def getBucketByUser(user):
 	url = 'http://%s/admin/bucket?format=json&stats=true&uid=%s' % (SERVER, user)
 	r = requests.get(url, auth=S3Auth(ACCESS_KEY, SECRET_KEY, SERVER))
 	bucketUsage = r.json()
+	key_root1 = user
 
+	# For bucket
 	for k in bucketUsage:
 		bucket = k['bucket']
+		if user == 'marcos':
+			if bucket == 'mycontainer':
+				print k['usage']
 		
+		# For usage
 		for k1,v1 in k['usage'].items():
-			log_verbose('Main: %s' % k1)
-			
+			#log_verbose('Main: %s' % k1)
+
+			# For usage items
 			for k2,v2 in v1.items():
-				key_name = METRIC_DELIM.join([user, bucket, 'summary', k1,  k2])
-				log_verbose('Path: %s  bucket: %s, chave: %s, valor: %s' % (key_name, bucket, k2, v2))
+				try:
+		    			key_root1, val_type = METRIC_TYPES[k2]
+					#log_verbose('Novas chaves: key_root1=%s - val_type=%s' % (key_root1, val_type))
+				except KeyError:
+					key_root1 = user
+					val_type = 'derive'
+
+				key_name = METRIC_DELIM.join([user, bucket, 'summary', k1.replace('rgw.', ''),  k2])
+				#log_verbose('Path: %s  bucket: %s, chave: %s, valor: %s' % (key_name, bucket, k2, v2))
 				val = collectd.Values(plugin='ceph')
-				val.type = 'derive'
+				val.type = val_type
 				val.type_instance = key_name
 				val.values = [v2]
 				val.dispatch()
@@ -150,12 +177,18 @@ def read_callback():
 		log_verbose('Dispatching: %s' %  key)
 		key_prefix = ''
 		key_root = key
-		key_name = METRIC_DELIM.join([key_prefix, key_root, 'summary'])
+		key_name = METRIC_DELIM.join([key_root, 'summary'])
 
 		for sk1,sv1 in value['summary'].items():
-			key_name = METRIC_DELIM.join([key_prefix, key_root, 'summary', sk1])
+			try:
+	    			key_root1, val_type = METRIC_TYPES[sk1]
+			except KeyError:
+				val_type = 'derive'
+
+			log_verbose('Novo tipo %s para %s' % (val_type, sk1))
+			key_name = METRIC_DELIM.join([key_root, 'summary', sk1])
 			val = collectd.Values(plugin='ceph')
-			val.type = 'derive'
+			val.type = val_type
 			val.type_instance = key_name
 			val.values = [sv1]
 			val.dispatch()
@@ -167,14 +200,14 @@ def read_callback():
 
 			#Parsing buckets stats per user
 			for k2,v2 in v1.items():
-				key_name = METRIC_DELIM.join([key_prefix, key_root, k1, k2, 'bytes_received'])
+				key_name = METRIC_DELIM.join([key_root, k1, k2, 'bytes_received'])
 				val = collectd.Values(plugin='ceph')
 				val.type = 'derive'
 				val.type_instance = key_name
 				val.values = [ v2['bytes_received'] ]
 				val.dispatch()
 
-				key_name = METRIC_DELIM.join([key_prefix, key_root, k1, k2, 'bytes_sent'])
+				key_name = METRIC_DELIM.join([key_root, k1, k2, 'bytes_sent'])
 				val = collectd.Values(plugin='ceph')
 				val.type = 'derive'
 				val.type_instance = key_name
