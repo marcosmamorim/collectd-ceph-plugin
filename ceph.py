@@ -86,19 +86,16 @@ def getBucketByUser(user):
 		
 		# For usage
 		for k1,v1 in k['usage'].items():
-			#log_verbose('Main: %s' % k1)
 
 			# For usage items
 			for k2,v2 in v1.items():
 				try:
 		    			key_root1, val_type = METRIC_TYPES[k2]
-					#log_verbose('Novas chaves: key_root1=%s - val_type=%s' % (key_root1, val_type))
 				except KeyError:
 					key_root1 = user
 					val_type = 'derive'
 
 				key_name = METRIC_DELIM.join([user, bucket, 'summary', k1.replace('rgw.', ''),  k2])
-				#log_verbose('Path: %s  bucket: %s, chave: %s, valor: %s' % (key_name, bucket, k2, v2))
 				val = collectd.Values(plugin='ceph')
 				val.type = val_type
 				val.type_instance = key_name
@@ -185,7 +182,6 @@ def read_callback():
 			except KeyError:
 				val_type = 'derive'
 
-			log_verbose('Novo tipo %s para %s' % (val_type, sk1))
 			key_name = METRIC_DELIM.join([key_root, 'summary', sk1])
 			val = collectd.Values(plugin='ceph')
 			val.type = val_type
